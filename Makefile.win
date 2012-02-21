@@ -1,0 +1,55 @@
+# Project: IMTS
+
+CC      = gcc.exe
+WINDRES = windres.exe
+DLLTOOL = dlltool.exe
+DLLWRAP = dllwrap.exe
+LIBS    = -L"D:/Programs/Dev-Cpp/lib" -L"./deps"
+INCS    = -I"D:/Programs/Dev-Cpp/include" -I"./deps"
+BIN     = mb-core.exe
+CFLAGS  = $(INCS) -DFOR_WINDOWS -Wall -o3
+
+# Builders.
+MAKERES = $(WINDRES) --input-format=rc -O coff
+MAKEDEF = $(DLLTOOL)
+MAKEDLL = $(DLLWRAP) $(LIBS) --quiet --no-export-all-symbols --add-stdcall-alias
+MAKEOBJ = $(CC) $(CFLAGS) -c
+MAKEEXE = $(CC) $(LIBS) -mwindows
+
+
+# Targets.
+FILES   = $(BIN) i_mapper.dll imperian.dll mmchat.dll voter.dll i_offense.dll
+EXTRA   = ChangeLog characters COPYING data IMap mhelp options *.is
+
+all: $(FILES)
+
+# Dependencies.
+LIBS_mb-core.exe   = -lzdll -lwsock32 -lcomctl32
+LIBS_i_offense.dll = -lpcre
+imperian.o: header.h module.h imperian.h
+i_mapper.o: header.h module.h i_mapper.h
+i_offense.o: header.h module.h deps/pcre.h
+winmain.o: header.h winres.h
+
+clean:
+	rm -f *~ *.o *.res *.def $(BIN) $(FILES)
+
+$(BIN): main.o winmain.o winres.res
+	@echo Making '$@' from '$^'...
+	@$(MAKEEXE) -o $@ $^ $(LIBS_$@)
+
+%.dll: %.o %.def
+	@echo Making '$@' from '$^'...
+	@$(MAKEDLL) -o $@ $< $(LIBS_$@) --def $*.def
+
+%.def: %.o
+	@echo Making '$@' from '$^'...
+	@$(MAKEDEF) -z $@ $< --dllname $*.dll
+
+%.o: %.c header.h module.h
+	@echo Making '$@' from '$^'...
+	@$(MAKEOBJ) -o $@ $<
+
+%.res: %.rc %.h
+	@echo Making '$@' from '$^'...
+	@$(MAKERES) -o $@ -i $<
