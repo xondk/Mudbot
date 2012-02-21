@@ -2021,7 +2021,7 @@ void new_descriptor( int control )
 	struct sockaddr_in  sock;
 	struct hostent     *from;
 	char buf[4096];
-	socklen_t size;
+	unsigned int size;
 	int addr, desc;
 	int ip1, ip2, ip3, ip4;
 
