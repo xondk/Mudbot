@@ -1,0 +1,6 @@
+mudbot
+*.dll
+*.so
+*.o
+config.txt
+tags

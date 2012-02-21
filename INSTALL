@@ -1,0 +1,24 @@
+UNIX
+====
+
+All you have to do is to type 'make', and pray. If all works well, you
+should be able to run the newly created './bot' executable, which will use
+the newly created *.so files.
+
+Should make fail, this is how a manual compile is done:
+bot - gcc [extra flags] -o bot main.c -lz -ldl
+modules - gcc [extra flags] -o name.so -shared name.c
+
+
+
+WINDOWS
+=======
+
+MudBot Core:
+-----------
+
+Compiling requires a MinGW package. Downloading Dev-Cpp is an easy way to
+get it, without any setup needed.
+
+Edit (not run) mk.bat, and change the path to your MinGW applications (make,
+gcc, dlltool, etc). Run it, and pray.
