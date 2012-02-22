@@ -569,6 +569,15 @@ void win_show_editor( )
 void win_composer_contents( char *string )
 {
    MENUITEMINFO miiMenu;
+   char *p;
+
+	/* Replace \n string for newlines */
+	p = strstr(string, "\\n");
+	while (p != NULL) {
+		memcpy(p, " \n", 2);
+		p = strstr(string, "\\n");
+	}
+
    
    if ( composer_contents )
      free( composer_contents );
