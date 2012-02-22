@@ -62,6 +62,7 @@ extern char client_hostname[1024], server_hostname[1024];
 extern int main_version_major, main_version_minor;
 extern int logging;
 extern int a_on;
+extern int g_on;
 extern int atcpoff;
 
 extern char *mb_section;
@@ -954,12 +955,6 @@ void SendBuffer( int ole )
         return;
      }
    
-   if ( ole && !a_on && !atcpoff )
-     {
-        MessageBox( hwndEMain, "Not properly authenticated with ATCP. Reconnect.", "Set OLE", 0 );
-        return;
-     }
-   
    bytes = SendMessage( hwndEEdit, WM_GETTEXT, (WPARAM) 16384, (LPARAM) buf );
    
    /* Convert all "\r\n"'s to "\n". */
@@ -980,6 +975,18 @@ void SendBuffer( int ole )
    if ( bytes > 0 && *(b-1) != '\n' )
      *(p++) = '\n';
    *p = 0;
+
+   if ( g_on ) {
+	   void send_gmcp_composer_content (char*);
+	   send_gmcp_composer_content(bytes);
+	   return;
+   }
+   
+   if ( ole && !a_on && !atcpoff )
+     {
+        MessageBox( hwndEMain, "Not properly authenticated with ATCP. Reconnect.", "Set OLE", 0 );
+        return;
+     }
    
    if ( client )
      {

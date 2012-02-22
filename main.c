@@ -282,6 +282,7 @@ int a_hp, a_mana, a_end, a_will, a_exp;
 int a_max_hp, a_max_mana, a_max_end, a_max_will;
 char a_name[512], a_title[512];
 int a_on;
+int g_on;
 
 
 void clientfb( char *string );
@@ -2733,7 +2734,7 @@ void send_gmcp_composer_content (char* content)
 	char sb_gmcp[] = { IAC, SB, TELOPT_GMCP, 0 };
 	char buf[4000];
 
-	sprintf(buf, "%s" "IRE.Composer.SetBuffer { %s }" "%s", sb_gmcp, content, iac_se);
+	sprintf(buf, "%s" "IRE.Composer.SetBuffer {%s}" "%s", sb_gmcp, content, iac_se);
 	send_to_server (buf);
 }
 
@@ -3896,6 +3897,7 @@ void process_buffer( char *raw_buf, int bytes )
 
 				sprintf(buf, "%s" "%s" "%s", sb_gmcp, gmcp_login_as, iac_se);
 				send_to_server( buf );
+				g_on = 1;
 
 				if ( default_user[0] && default_pass[0] ) {
 					sprintf( buf, "%s" "Char.Login { \"name\": \"%s\", \"password\": \"%s\" }" "%s",
@@ -4644,6 +4646,8 @@ int main( int argc, char **argv )
 {
 	int what = 0, help = 0;
 	int i;
+
+	g_on = 0;
 
 	/* We'll need this for a copyover. */
 	if ( argv[0] )
