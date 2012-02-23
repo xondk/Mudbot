@@ -62,7 +62,7 @@ extern char client_hostname[1024], server_hostname[1024];
 extern int main_version_major, main_version_minor;
 extern int logging;
 extern int a_on;
-
+extern int g_on;
 
 extern char *mb_section;
 extern char *desc_name;
@@ -569,6 +569,15 @@ void win_show_editor( )
 void win_composer_contents( char *string )
 {
    MENUITEMINFO miiMenu;
+   char *p;
+
+	/* Replace \n string for newlines */
+	p = strstr(string, "\\n");
+	while (p != NULL) {
+		memcpy(p, " \n", 2);
+		p = strstr(string, "\\n");
+	}
+
 
    if ( composer_contents )
      free( composer_contents );
@@ -945,12 +954,6 @@ void SendBuffer( int ole )
         return;
      }
 
-   if ( ole && !a_on )
-     {
-        MessageBox( hwndEMain, "Not properly authenticated with ATCP. Reconnect.", "Set OLE", 0 );
-        return;
-     }
-
    bytes = SendMessage( hwndEEdit, WM_GETTEXT, (WPARAM) 16384, (LPARAM) buf );
 
    /* Convert all "\r\n"'s to "\n". */
@@ -969,8 +972,22 @@ void SendBuffer( int ole )
      }
    /* And don't let it end without a new line. */
    if ( bytes > 0 && *(b-1) != '\n' )
-     *(p++) = '\n';
+     *(p++) = '\0';
    *p = 0;
+
+   if ( g_on ) {
+	   void send_gmcp_composer_content (char*);
+	   send_gmcp_composer_content(pbuf);
+	   clientff( C_B "Sent %d bytes. Check *echo, to verify.\n" C_0, bytes );
+	   free (pbuf);
+	   return;
+   }
+
+   if ( ole && !a_on )
+     {
+        MessageBox( hwndEMain, "Not properly authenticated with ATCP. Reconnect.", "Set OLE", 0 );
+        return;
+     }
 
    if ( client )
      {
