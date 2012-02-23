@@ -940,8 +940,8 @@ void SendBuffer( int ole )
 	void send_to_server( char *string );
 	const char sb_atcp[] = { IAC, SB, TELOPT_ATCP, 0 };
 	const char se[] = { IAC, SE, 0 };
-	char buf[16384];
-	char buf2[16384+16];
+	char buf[32768];
+	char buf2[32768+16];
 	char *pbuf, *p, *b;
 	int bytes;
 
@@ -954,7 +954,7 @@ void SendBuffer( int ole )
 		return;
 	}
 
-	bytes = SendMessage( hwndEEdit, WM_GETTEXT, (WPARAM) 16384, (LPARAM) buf );
+	bytes = SendMessage( hwndEEdit, WM_GETTEXT, (WPARAM) 32768, (LPARAM) buf );
 
 	/* Convert all "\r\n"'s to "\n". */
 	pbuf = malloc( bytes );
@@ -980,12 +980,6 @@ void SendBuffer( int ole )
 		send_gmcp_composer_content(pbuf);
 		clientff( C_B "Sent %d bytes. Check *echo, to verify.\n" C_0, bytes );
 		free (pbuf);
-		return;
-	}
-
-	if ( ole && !a_on )
-	{
-		MessageBox( hwndEMain, "Not properly authenticated with ATCP. Reconnect.", "Set OLE", 0 );
 		return;
 	}
 
@@ -1015,13 +1009,13 @@ void SaveBuffer( int b )
 {
    MENUITEMINFO miiMenu;
    UINT menu_handle[] = { ID_EDM_LOADB1, ID_EDM_LOADB2, ID_EDM_LOADB3 };
-   char buf[16384];
+   char buf[32768];
    int bytes;
 
    if ( editor_buffer[b] )
      free( editor_buffer[b] );
 
-   bytes = SendMessage( hwndEEdit, WM_GETTEXT, (WPARAM) 16384, (LPARAM) buf );
+   bytes = SendMessage( hwndEEdit, WM_GETTEXT, (WPARAM) 32768, (LPARAM) buf );
 
    editor_buffer[b] = malloc( bytes + 1 );
 

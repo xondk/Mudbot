@@ -1,19 +1,19 @@
 /*
  * Copyright (c) 2004, 2005  Andrei Vasiliu
- * 
- * 
+ *
+ *
  * This file is part of MudBot.
- * 
+ *
  * MudBot is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * MudBot is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with MudBot; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
@@ -111,7 +111,7 @@
 # endif
 #else
 # include <sys/socket.h>  /* All socket stuff */
-# include <sys/time.h>    /* For gettimeofday() */ 
+# include <sys/time.h>    /* For gettimeofday() */
 # include <netdb.h>       /* For gethostbyaddr() and others */
 # include <netinet/in.h>  /* For sockaddr_in */
 # include <arpa/inet.h>   /* For addr_aton */
@@ -270,18 +270,18 @@ char client_hostname[1024];
 /* Options from config.txt */
 char default_host[512];
 int default_port;
-char atcp_login_as[512];
+/*char atcp_login_as[512];*/
 char gmcp_login_as[512];
 char default_user[512];
 char default_pass[512];
 int default_mxp_mode = 7;
 int strip_telnet_ga;
 
-/* ATCP. */
+/* ATCP. *//*
 int a_hp, a_mana, a_end, a_will, a_exp;
 int a_max_hp, a_max_mana, a_max_end, a_max_will;
 char a_name[512], a_title[512];
-int a_on;
+int a_on;*/
 int g_on;
 
 
@@ -365,12 +365,12 @@ void *get_variable( char *name )
 	} variables[ ] =
 	{
 		/* ATCP */
-		{ "a_on", &a_on },
+	/*	{ "a_on", &a_on },
 		{ "a_hp", &a_hp },
 		{ "a_max_hp", &a_max_hp },
 		{ "a_mana", &a_mana },
 		{ "a_max_mana", &a_max_mana },
-		{ "a_exp", &a_exp },
+		{ "a_exp", &a_exp },*/
 
 		{ NULL, NULL }
 	}, *p;
@@ -777,12 +777,12 @@ void read_config( char *file_name, int silent )
 
 			strcpy( default_pass, buf );
 		}
-		else if ( !strcmp( cmd, "atcp_login_as" ) )
+	/*	else if ( !strcmp( cmd, "atcp_login_as" ) )
 		{
 			get_string( p, buf, 256 );
 
 			strcpy( atcp_login_as, buf );
-		}
+		}*/
 		else if ( !strcmp( cmd, "gmcp_login_as" ) )
 		{
 			get_string( p, buf, 256 );
@@ -2415,10 +2415,10 @@ void clientfb( char *string )
 }
 
 
-void clientfr( char *string )    
+void clientfr( char *string )
 {
-	clientf( C_R "[" );	   
-	clientf( string );	     
+	clientf( C_R "[" );
+	clientf( string );
 	clientf( "]\r\n" C_0 );
 }
 
@@ -2617,7 +2617,7 @@ void del_timer( char *name )
 
 
 
-int atcp_authfunc( char *seed )
+/*int atcp_authfunc( char *seed )
 {
 	int a = 17;
 	int len = strlen( seed );
@@ -2634,11 +2634,11 @@ int atcp_authfunc( char *seed )
 	}
 
 	return a;
-}
+}*/
 
 
 
-void handle_atcp( char *msg )
+/*void handle_atcp( char *msg )
 {
 	char act[256];
 	char opt[256];
@@ -2694,7 +2694,7 @@ void handle_atcp( char *msg )
 		}
 	}
 
-	/* Bleh, has a newline after it too. */
+*/	/* Bleh, has a newline after it too. *//*
 	else if ( !strncmp( act, "Char.Vitals", 10 ) )
 	{
 		if ( !a_on )
@@ -2734,12 +2734,12 @@ void handle_atcp( char *msg )
 		}
 #endif
 	}
-}
+}*/
 
 void send_gmcp_composer_content (char* content)
 {
 	char sb_gmcp[] = { IAC, SB, TELOPT_GMCP, 0 };
-	char buf[4000];
+	char buf[32768];
 
 	sprintf(buf, "%s" "IRE.Composer.SetBuffer {%s}" "%s", sb_gmcp, content, iac_se);
 	send_to_server (buf);
@@ -2747,7 +2747,7 @@ void send_gmcp_composer_content (char* content)
 
 char* find_gmcp_value_for(const char *key, const char *buf)
 {
-	/* What we are working with:  
+	/* What we are working with:
 	 * "{ "title": "%s", "text": "%s" } */
 	char *value;
 	int value_len;
@@ -2763,7 +2763,7 @@ char* find_gmcp_value_for(const char *key, const char *buf)
 	/* Skip to the second '"' */
 	p = strchr(p, '"') + 1;
 	p = strchr(p, '"') + 1;
-	
+
 	/* Now p points at the start of the content,
 	 * so we find the end of it. */
 	end = strchr(p, '"') - 1;
@@ -2913,9 +2913,9 @@ void client_telnet( char *buf, char *dst, int *bytes )
 int check_sub_telnet( char *sub )
 {
 	if ( sub[0] == (char) TELOPT_ATCP ) {
-		handle_atcp( sub+1 );
+	/*	handle_atcp( sub+1 );*/
 		/* Either it's on, or we'll want it on. */
-		return a_on || strcmp( atcp_login_as, "none" );
+		/*return a_on || strcmp( atcp_login_as, "none" );*/
 	} else if (sub[0] == (char) TELOPT_GMCP) {
 		handle_gmcp( sub+1 );
 	} else {
@@ -3021,7 +3021,7 @@ int mxp_stag( int tag, char *dest )
 }
 
 void do_test( )
-{ 
+{
 	// No test right now.
 }
 
@@ -3137,7 +3137,7 @@ void process_client_line( char *buf )
 		}
 		else if ( !strcmp( buf, "`mccp start" ) )
 		{
-			char mccp_start[] = 
+			char mccp_start[] =
 			{ IAC, DO, TELOPT_COMPRESS2, 0 };
 
 #if defined( DISABLE_MCCP )
@@ -3151,7 +3151,7 @@ void process_client_line( char *buf )
 				clientfb( "Not while in safe mode." );
 			}
 			else if ( !compressed )
-			{	     
+			{
 				clientfb( "Attempting to start decompression." );
 				send_to_server( mccp_start );
 				verbose_mccp = 1;
@@ -3164,7 +3164,7 @@ void process_client_line( char *buf )
 		}
 		else if ( !strcmp( buf, "`mccp stop" ) )
 		{
-			char mccp_stop[] = 
+			char mccp_stop[] =
 			{ IAC, DONT, TELOPT_COMPRESS2, 0 };
 
 			clientfb( "Attempting to stop decompression." );
@@ -3177,7 +3177,7 @@ void process_client_line( char *buf )
 		{
 			clientfb( "Use either `mccp start, or `mccp stop." );
 		}
-		else if ( !strcmp( buf, "`atcp" ) )
+	/*	else if ( !strcmp( buf, "`atcp" ) )
 		{
 			clientfb( "ATCP info:" );
 			clientff( "Logged on: " C_G "%s" C_0 ".\r\n",
@@ -3196,7 +3196,7 @@ void process_client_line( char *buf )
 				clientff( "NL:" C_G "%d" C_0 "/" C_G "100" C_0 ".\r\n",
 						a_exp );
 			}
-		}
+		}*/
 		else if ( !strcmp( buf, "`mods" ) )
 		{
 			show_modules( );
@@ -3271,7 +3271,7 @@ void process_client_line( char *buf )
 			if ( bytes_uncompressed )
 				clientff( "Compression ratio: " C_G "%d%%" C_0 ".\r\n", ( bytes_received * 100 ) / bytes_uncompressed );
 			clientff( "MCCP: " C_G "%s" C_0 ".\r\n", compressed ? "On" : "Off" );
-			clientff( "ATCP: " C_G "%s" C_0 ".\r\n", a_on ? "On" : "Off" );
+		/*	clientff( "ATCP: " C_G "%s" C_0 ".\r\n", a_on ? "On" : "Off" );*/
 		}
 		else if ( !strncmp( buf, "`echo ", 6 ) )
 		{
@@ -3308,14 +3308,14 @@ void process_client_line( char *buf )
 		{
 			clientfb( "Usage: `echo <string>" );
 		}
-		else if ( !strncmp( buf, "`sendatcp", 9 ) )
+	/*	else if ( !strncmp( buf, "`sendatcp", 9 ) )
 		{
 			const char sb_atcp[] = { IAC, SB, TELOPT_ATCP, 0 };
 			char buf[1024];
 
 			sprintf( buf, "%s%s%s", sb_atcp, buf + 10, iac_se );
 			send_to_server( buf );
-		}
+		}*/
 		else if ( !strcmp( buf, "`edit" ) )
 		{
 #if defined( FOR_WINDOWS )
@@ -3388,7 +3388,7 @@ void process_client_line( char *buf )
 					" `disconnect - Disconnects, giving you a chance to connect again.\r\n"
 					" `mccp start - This will ask the server to begin compression.\r\n"
 					" `mccp stop  - Stop the Mud Client Compression Protocol.\r\n"
-					" `atcp       - Show any ATCP info.\r\n"
+				/*	" `atcp       - Show any ATCP info.\r\n"*/
 					" `mods       - Show the modules currently built in.\r\n"
 					" `load <m>   - Attempt to load a module from a file 'm'.\r\n"
 					" `unload <m> - Unload the module named 'm'.\r\n"
@@ -3898,7 +3898,7 @@ void process_buffer( char *raw_buf, int bytes )
 				debugf( "gmcp: Sent IAC DO GMCP." );
 
 				if ( !gmcp_login_as[0] || !strcmp( gmcp_login_as, "default" ) ) {
-					sprintf(gmcp_login_as, "Core.Hello { \"client\": \"%s\", \"version\": \"%d.%d\" }", 
+					sprintf(gmcp_login_as, "Core.Hello { \"client\": \"%s\", \"version\": \"%d.%d\" }",
 							"Mudbot", main_version_major, main_version_minor);
 				}
 
@@ -3918,8 +3918,8 @@ void process_buffer( char *raw_buf, int bytes )
 						sb_gmcp, iac_se);
 				send_to_server( buf );
 				continue;
-			
-			} else if ( iac_string[1] == (char) WILL &&
+
+			} /*else if ( iac_string[1] == (char) WILL &&
 					iac_string[2] == (char) TELOPT_ATCP &&
 					strcmp( atcp_login_as, "none" ) )
 			{
@@ -3927,7 +3927,7 @@ void process_buffer( char *raw_buf, int bytes )
 				char do_atcp[] = { IAC, DO, TELOPT_ATCP, 0 };
 				char sb_atcp[] = { IAC, SB, TELOPT_ATCP, 0 };
 
-				/* Send it for ourselves. */
+*/				/* Send it for ourselves. *//*
 				send_to_server( do_atcp );
 
 				debugf( "atcp: Sent IAC DO ATCP." );
@@ -3947,7 +3947,7 @@ void process_buffer( char *raw_buf, int bytes )
 					debugf( "atcp: Requested login with '%s'.", default_user );
 				}
 				continue;
-			}
+			}*/
 
 			else if ( iac_string[1] == (char) GA ||
 					iac_string[1] == (char) EOR )
@@ -4270,7 +4270,7 @@ int mccp_decompress( char *src, int src_bytes )
 			}
 
 			compressed = 0;
-			clientfb( "MCCP error." ); 
+			clientfb( "MCCP error." );
 			send_to_server( c2_stop );
 			break;
 		}
@@ -4809,7 +4809,7 @@ int main( int argc, char **argv )
  * Checks a string to see if it matches a trigger string.
  * String "Hello world!" matches trigger "Hel*orld!".
  * String "Hello world!" matches trigger "Hello ^!". (single word)
- * 
+ *
  * Returns 0 if the strings match, 1 if not.
  */
 int cmp(char* str1, char* str2)
