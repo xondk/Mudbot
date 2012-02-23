@@ -947,7 +947,7 @@ void SendBuffer( int ole )
 
 	if ( !hwndEEdit )
 		return;
-	/* comment out this, work from here */
+
 	if ( !server )
 	{
 		MessageBox( hwndEMain, "Not connected!", "Send Buffer", 0 );
@@ -1091,12 +1091,6 @@ LRESULT CALLBACK MainWndProc( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam 
       case WM_DESTROY:
 	PostQuitMessage( 0 );
 	break;
-
-	//		case WM_PAINT:
-	//			UpdateWindow( hwndTab );
-	//			UpdateWindow( hwndEdit );
-	//			UpdateWindow( hwndMods );
-	//			break;
 
       case WM_SIZE:
 	  {
