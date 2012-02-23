@@ -647,9 +647,16 @@ void generate_config( char *file_name )
 
 	fprintf( fl, "# Name to use on ATCP authentication. To disable ATCP use \"none\".\n"
 			"# To login as \"MudBot <actual version>\" use \"default\" or leave it empty.\n\n"
-			"atcp_login_as \"default\"\n"
+			"#atcp_login_as \"none\"\n"
 			"#atcp_login_as \"Nexus 3.0.1\"\n"
 			"#atcp_login_as \"JavaClient 2.4.8\"\n\n\n" );
+
+	fprintf( fl, "# Name to use on GMCP authentication. To disable GMCP use \"none\".\n"
+			"# To login as \"MudBot <actual version>\" use \"default\" or leave it empty.\n"
+			"# Note: When using this your client should use Core.Supports.Add and not Core.Supports set\n"
+			"# as to not override the mudbots settings.\n"
+			"gmcp_login_as \"default\"\n"
+			"#gmcp_login_as \"Core.Hello { \"client\": \"<CLIENT>\", \"version\": \"<VERSION>\" }\".\n\n\n" );
 
 	fprintf( fl, "# Mud Client Compression Protocol.\n\n"
 			"disable_mccp \"no\"\n\n\n" );

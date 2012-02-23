@@ -936,78 +936,78 @@ void UpdateTimer( )
 
 void SendBuffer( int ole )
 {
-   void clientff( char *string, ... );
-   void send_to_server( char *string );
-   const char sb_atcp[] = { IAC, SB, TELOPT_ATCP, 0 };
-   const char se[] = { IAC, SE, 0 };
-   char buf[16384];
-   char buf2[16384+16];
-   char *pbuf, *p, *b;
-   int bytes;
+	void clientff( char *string, ... );
+	void send_to_server( char *string );
+	const char sb_atcp[] = { IAC, SB, TELOPT_ATCP, 0 };
+	const char se[] = { IAC, SE, 0 };
+	char buf[16384];
+	char buf2[16384+16];
+	char *pbuf, *p, *b;
+	int bytes;
 
-   if ( !hwndEEdit )
-     return;
-   /* comment out this, work from here */
-   if ( !server )
-     {
-        MessageBox( hwndEMain, "Not connected!", "Send Buffer", 0 );
-        return;
-     }
+	if ( !hwndEEdit )
+		return;
+	/* comment out this, work from here */
+	if ( !server )
+	{
+		MessageBox( hwndEMain, "Not connected!", "Send Buffer", 0 );
+		return;
+	}
 
-   bytes = SendMessage( hwndEEdit, WM_GETTEXT, (WPARAM) 16384, (LPARAM) buf );
+	bytes = SendMessage( hwndEEdit, WM_GETTEXT, (WPARAM) 16384, (LPARAM) buf );
 
-   /* Convert all "\r\n"'s to "\n". */
-   pbuf = malloc( bytes );
-   p = pbuf;
-   b = buf;
-   while( *b )
-     {
-	if ( *b == '\r' )
-	  {
-	     b++;
-	     continue;
-	  }
+	/* Convert all "\r\n"'s to "\n". */
+	pbuf = malloc( bytes );
+	p = pbuf;
+	b = buf;
+	while( *b )
+	{
+		if ( *b == '\r' )
+		{
+			b++;
+			continue;
+		}
 
-	*(p++) = *(b++);
-     }
-   /* And don't let it end without a new line. */
-   if ( bytes > 0 && *(b-1) != '\n' )
-     *(p++) = '\0';
-   *p = 0;
+		*(p++) = *(b++);
+	}
+	/* And don't let it end without a new line. */
+	if ( bytes > 0 && *(b-1) != '\0' )
+		*(p++) = '\0';
+	*p = 0;
 
-   if ( g_on ) {
-	   void send_gmcp_composer_content (char*);
-	   send_gmcp_composer_content(pbuf);
-	   clientff( C_B "Sent %d bytes. Check *echo, to verify.\n" C_0, bytes );
-	   free (pbuf);
-	   return;
-   }
+	if ( g_on ) {
+		void send_gmcp_composer_content (char*);
+		send_gmcp_composer_content(pbuf);
+		clientff( C_B "Sent %d bytes. Check *echo, to verify.\n" C_0, bytes );
+		free (pbuf);
+		return;
+	}
 
-   if ( ole && !a_on )
-     {
-        MessageBox( hwndEMain, "Not properly authenticated with ATCP. Reconnect.", "Set OLE", 0 );
-        return;
-     }
+	if ( ole && !a_on )
+	{
+		MessageBox( hwndEMain, "Not properly authenticated with ATCP. Reconnect.", "Set OLE", 0 );
+		return;
+	}
 
-   if ( client )
-     {
-        if ( !ole )
-	  clientff( C_B "Sending %d bytes...\n" C_0, bytes );
-        else
-	  clientff( C_B "Sent %d bytes. Check *echo, to verify.\n" C_0, bytes );
-     }
+	if ( client )
+	{
+		if ( !ole )
+			clientff( C_B "Sending %d bytes...\n" C_0, bytes );
+		else
+			clientff( C_B "Sent %d bytes. Check *echo, to verify.\n" C_0, bytes );
+	}
 
-   if ( ole )
-     {
-        sprintf( buf2, "%solesetbuf\n%s%s", sb_atcp, pbuf, se );
-        send_to_server( buf2 );
-     }
-   else
-     {
-        send_to_server( pbuf );
-     }
+	if ( ole )
+	{
+		sprintf( buf2, "%solesetbuf\n%s%s", sb_atcp, pbuf, se );
+		send_to_server( buf2 );
+	}
+	else
+	{
+		send_to_server( pbuf );
+	}
 
-   free( pbuf );
+	free( pbuf );
 }
 
 
