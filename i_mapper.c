@@ -31,7 +31,7 @@
 #include <sys/stat.h>
 
 int mapper_version_major = 5;
-int mapper_version_minor = 71;
+int mapper_version_minor = 72;
 
 
 char *i_mapper_id = I_MAPPER_ID "\r\n" I_MAPPER_H_ID "\r\n" HEADER_ID "\r\n" MODULE_ID "\r\n";
@@ -6083,6 +6083,45 @@ void parse_window( char *line )
 }
 
 
+void parse_cgc( char *line )
+{
+    if (!strncmp(line, "(",1) && strstr(line, "):") && strstr(line, "ocation: ") )
+    {
+    char buf[256],*buf2 = NULL,line2[256],buf3[256];
+	AREA_DATA *farea = NULL;
+    memset( buf, '\0', sizeof(buf) );
+    memset( line2, '\0', sizeof(line2) );
+    memset( buf3, '\0', sizeof(buf3) );
+    line = strstr(line, "ocation: ");
+    line += 9;
+    strncpy(buf, line,strlen(line)-1);
+
+	buf2 = buf;
+	while ( buf2 && strstr(buf2, " in ") )
+	{
+		buf2 += 4;
+		if ( strstr(buf2, " in ") )
+			buf2 = strstr(buf2, " in ");
+	}
+	strncpy( line2, buf, buf2 - buf );
+	line2[buf2-buf-4] = '.';
+	line2[buf2-buf-3] = 0;
+	if ( !strncmp( buf2, "the ", 4 ) ) {
+		buf2 += 4;
+	}
+	sprintf(buf3, "donotshow %s",buf2 );
+	farea = get_area_by_name( buf3 );
+	if ( farea && farea->name )
+	{
+		locate_room_in_area( line2, NULL ,0, farea );
+	}
+	else
+	{
+		locate_room( buf, 2, NULL );
+	}
+    }
+}
+
 
 void parse_scent( char *line )
 {
@@ -8185,6 +8224,7 @@ void i_mapper_process_server_line( LINE *l )
 		parse_window( l->line );
 		parse_eldsense( l->line );
 		parse_scent( l->line );
+		parse_cgc( l->line );
 		parse_allysense( l->line );
 		parse_alarm( l->line );
 		parse_wormholes( l->line );
@@ -11214,6 +11254,12 @@ void do_area_info( char *arg )
 
 	sprintf( buf, "Area: %s", current_area->name );
 	clientfr( buf );
+
+    if (current_area->note)
+    {
+        sprintf(buf, "Area Note: %s",current_area->note );
+        clientfr(buf);
+    }
 
 	for ( room = current_area->rooms; room; room = room->next_in_area )
 	{
