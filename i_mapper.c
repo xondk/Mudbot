@@ -256,7 +256,7 @@ char *underitem;
 
 char *wingcmd;
 int wingroom = 0;
-ROOM_DATA *destroom;
+int wingtmpdisable = 0;
 
 int wateroption = 0;
 int automapsize = 0;
@@ -5212,10 +5212,8 @@ void init_openlist( ROOM_DATA *room )
 	if ( !room )
 	{
 		pf_current_openlist = NULL;
-		destroom = NULL;
 		return;
 	}
-    destroom = room;
 	/* Make sure it's not already there. */
 	for ( r = pf_current_openlist; r; r = r->next_in_pfco )
 		if ( r == room )
@@ -5236,18 +5234,16 @@ void init_openlist( ROOM_DATA *room )
 
 int cmp_room_wing()
 {
-    if (wingroom == 0 || wingcmd == NULL)
+    if (wingroom == 0 || wingcmd == NULL || disable_artifacts || wingtmpdisable )
     return 0;
 
     if (!strcmp(current_room->area->name, "The Havens."))
     return 0;
 
-    ROOM_DATA *savedest;
     ROOM_DATA *room;
     int lennorm;
     int lenwing;
 
-    savedest = destroom;
 
     for (room = current_room; room; room = room->pf_parent) {lennorm++;}
     for (room = get_room(wingroom); room; room = room->pf_parent) {lenwing++;}
@@ -8631,6 +8627,9 @@ void i_mapper_process_server_prompt( LINE *l )
 	if ( ssight )
 		ssight = 0;
 
+    if ( wingtmpdisable )
+        wingtmpdisable = 0;
+
 	memset( fullline, '\0', sizeof(fullline) );
 
 	if ( area_search && searching )
@@ -9144,6 +9143,7 @@ void do_map_path( char *arg )
 		if ( strstr( arg, "from" ) ) {
 			arg = get_string( arg+5, buft, 256 );
 			fromf = 1;
+			wingtmpdisable = 1;
 		}
 		if ( strstr( arg, "avoid" ) && !fromf && !neari ) {
 			arg = get_string( arg+6, bufe, 256 );
@@ -9641,8 +9641,8 @@ void do_map_config( char *arg )
 			"Auto-linking disabled.",
 			"Auto-linking enabled." },
 		{ "artifacts", &disable_artifacts,
-			"Pathfinding with artifact hotspots disabled.",
-			"Pathfinding with artifact hotspots enabled." },
+			"Pathfinding with artifact disabled.",
+			"Pathfinding with artifact enabled." },
 		{ "add", &disable_additional_name,
 			"Additional Name adding disabled.",
 			"Additional Name Adding enabled." },
