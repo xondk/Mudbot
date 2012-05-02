@@ -31,7 +31,7 @@
 #include <sys/stat.h>
 
 int mapper_version_major = 5;
-int mapper_version_minor = 72;
+int mapper_version_minor = 74;
 
 
 char *i_mapper_id = I_MAPPER_ID "\r\n" I_MAPPER_H_ID "\r\n" HEADER_ID "\r\n" MODULE_ID "\r\n";
@@ -253,6 +253,11 @@ int disable_pathwrap = 0;
 int disable_shrineradiuscheck = 0;
 
 char *underitem;
+
+char *wingcmd;
+int wingroom = 0;
+ROOM_DATA *destroom;
+
 int wateroption = 0;
 int automapsize = 0;
 int disable_auto_unlock;
@@ -3430,6 +3435,10 @@ int save_settings( char *file )
 	fprintf( fl, "Disable-ForceWrap %s\r\n", disable_forcewrap ? "yes" : "no");
 	fprintf( fl, "Disable-Vnum %s\r\n", disable_vnum ? "yes" : "no");
 	fprintf( fl, "Disable-Pathwrap %s\r\n", disable_pathwrap ? "yes" : "no");
+
+	fprintf( fl, "Mapwing-Command %s\r\n",wingcmd == NULL ? "nothing" : wingcmd );
+	fprintf( fl, "Mapwing-Room %d\r\n",wingroom );
+
 	/* Save all room tags. */
 
 	fprintf( fl, "\r\n# Room Tags.\r\n\r\n" );
@@ -3787,6 +3796,27 @@ int load_settings( char *file )
 			else
 				debugf( "Parse error in file '%s', expected 'yes' or 'no', got '%s' instead.", file, value );
 		}
+		else if ( !strcmp( option, "Mapwing-Command" ) )
+		{
+			if ( !strcmp( value, "nothing" ) ) {
+                wingcmd = malloc(60); strcpy(wingcmd, value);wingcmd=NULL;free(wingcmd);}
+			else if ( strcmp( value, "nothing" ) )
+				{
+				    wingcmd = malloc(60); strcpy(wingcmd, value);
+				}
+			else
+				debugf( "Parse error in file '%s', expected 'yes' or 'no', got '%s' instead.", file, value );
+		}
+		else if ( !strcmp( option, "Mapwing-Room" ) )
+		{
+			if ( atoi(value) )
+				wingroom = atoi(value);
+			else if ( atoi(value) == 0 )
+				wingroom = 0;
+			else
+				debugf( "Parse error in file '%s', expected 'yes' or 'no', got '%s' instead.", file, value );
+		}
+
 		else if ( !strcmp( option, "Land-Mark" ) )
 		{
 			ROOM_DATA *room;
@@ -5182,9 +5212,10 @@ void init_openlist( ROOM_DATA *room )
 	if ( !room )
 	{
 		pf_current_openlist = NULL;
+		destroom = NULL;
 		return;
 	}
-
+    destroom = room;
 	/* Make sure it's not already there. */
 	for ( r = pf_current_openlist; r; r = r->next_in_pfco )
 		if ( r == room )
@@ -5203,6 +5234,28 @@ void init_openlist( ROOM_DATA *room )
 	}
 }
 
+int cmp_room_wing()
+{
+    if (wingroom == 0 || wingcmd == NULL)
+    return 0;
+
+    if (!strcmp(current_room->area->name, "The Havens."))
+    return 0;
+
+    ROOM_DATA *savedest;
+    ROOM_DATA *room;
+    int lennorm;
+    int lenwing;
+
+    savedest = destroom;
+
+    for (room = current_room; room; room = room->pf_parent) {lennorm++;}
+    for (room = get_room(wingroom); room; room = room->pf_parent) {lenwing++;}
+    if (lenwing<lennorm)
+    return 1;
+    else
+    return 0;
+}
 
 int get_cost( ROOM_DATA *src, ROOM_DATA *dest )
 {
@@ -5357,6 +5410,8 @@ void show_path( ROOM_DATA *current )
 	int wrap = 7; /* strlen( "[Path: " ) */
 	int nrmax = 100;
 	int hexited = 0;
+    int autow;
+    int aused = 0;
 
 	DEBUG( "show_path" );
 
@@ -5379,7 +5434,14 @@ void show_path( ROOM_DATA *current )
 		nrmax = 4000;
 
 	sprintf( buf, C_R "[Path: " C_G );
-	for ( room = current; room && room->pf_parent && nr < nrmax; room = room->pf_parent )
+    autow = cmp_room_wing();
+    if (autow) {
+    room = get_room(wingroom);
+    artimsg = wingcmd;
+    }
+    else
+    room = current;
+	for ( room = room; room && room->pf_parent && nr < nrmax; room = room->pf_parent )
 	{
 		if ( wrap > 70 && !disable_pathwrap )
 		{
@@ -5393,11 +5455,57 @@ void show_path( ROOM_DATA *current )
 		}
 
 		/* We also have special exits. */
-		if ( !strcmp(current_room->area->name, "The Havens.") && !hexited )
+		if (autow && !aused)
+		{strcat(buf, C_D);
+			strcat( buf, wingcmd);
+			wrap += strlen(wingcmd);
+			aused = 1;
+
+		    if ( wrap > 70 && !disable_pathwrap )
+		    {
+			    strcat( buf, C_R ",\r\n" C_G );
+			    wrap = 0;
+		    }
+		    else if ( nr++ )
+		    {
+			    strcat( buf, C_R ", " C_G );
+			    wrap += 2;
+            }
+
+			if ( ( room->pf_direction != -1 ) && ( room->pf_direction != -2 ) )
+	    	{
+			    if ( must_swim( room, room->pf_parent ) )
+				    strcat( buf, C_B );
+
+			    strcat( buf, dir_small_name[room->pf_direction] );
+			    wrap += strlen( dir_small_name[room->pf_direction] );
+		    }
+		}
+		else if ( !strcmp(current_room->area->name, "The Havens.") && !hexited )
 		{strcat(buf, C_D);
 			strcat( buf, "Exit Haven");
 			wrap += 10;
 			hexited=1;
+
+		    if ( wrap > 70 && !disable_pathwrap )
+		    {
+			    strcat( buf, C_R ",\r\n" C_G );
+			    wrap = 0;
+		    }
+		    else if ( nr++ )
+		    {
+			    strcat( buf, C_R ", " C_G );
+			    wrap += 2;
+		    }
+
+			if ( ( room->pf_direction != -1 ) && ( room->pf_direction != -2 ) )
+		     {
+			    if ( must_swim( room, room->pf_parent ) )
+				    strcat( buf, C_B );
+
+			     strcat( buf, dir_small_name[room->pf_direction] );
+                 wrap += strlen( dir_small_name[room->pf_direction] );
+		     }
 		}
 		else if ( ( room->pf_direction != -1 ) && ( room->pf_direction != -2 ) )
 		{
@@ -10247,6 +10355,38 @@ void do_map_ruler( char *arg )
 	}
 }
 
+
+void do_map_wing( char *arg)
+{
+
+  if ( !arg[0] )
+  {
+      clientfr("Map wings. Commands:");
+      clientf( "Map wing set : Sets the custom wings command.\r\n"
+               "Map wing room: Sets the room of your wings.\r\n"
+               "Map wing rem : Removes the custom wing command and room.\r\n" );
+       clientff(C_Y"Currently cmd: '%s' room: '%d'\r\n"C_0,wingcmd == NULL ? "nothing" : wingcmd, wingroom );
+  }
+  if (strstr(arg,"set"))
+  {
+   wingcmd = malloc(60); strcpy(wingcmd, arg + 4);
+   clientff(C_R"[Wing command set to: '%s']\r\n"C_0,wingcmd);
+  }
+  if (strstr(arg,"room"))
+  {
+   wingroom = atoi(arg+5);
+   clientff(C_R"[Wing room set to: '%d']\r\n"C_0,wingroom);
+  }
+  if (strstr(arg,"rem"))
+  {
+   wingcmd = NULL;
+   free(wingcmd);
+   wingroom = 0;
+   clientfr("Wing command and room deleted");
+  }
+}
+
+
 /* Area commands. */
 
 void do_area_help( char *arg )
@@ -14115,7 +14255,8 @@ void do_go( char *arg )
 	memset(guardnum,'\0',sizeof(guardnum));
 	troopmove = 0;
 	guardmove = 0;
-
+	int autowing;
+	autowing = cmp_room_wing();
 	if ( strstr(arg, "gallop") )
 		if ( !mounted )
 		{ clientfr("Maybe you should mount up?");return;
@@ -14129,6 +14270,8 @@ void do_go( char *arg )
 		dash_command = "gallop ";
 	else if ( !strcmp(arg, "shift") )
 		dash_command = "sand shift ";
+    else if ( autowing )
+         artimsg = wingcmd;
 	else if ( strstr( arg, "voltda" ) )
 	{
 		artimsg = "voltda";
@@ -14142,6 +14285,8 @@ void do_go( char *arg )
 			dash_command = "sprint ";
 		else if ( strstr(arg, "shift") )
 			dash_command = "sand shift ";
+        else if ( autowing )
+            artimsg = wingcmd;
 	}
 	else if ( strstr( arg, "duanathar" ) )
 	{
@@ -14156,6 +14301,8 @@ void do_go( char *arg )
 			dash_command = "sprint ";
 		else if ( strstr(arg, "shift") )
 			dash_command = "sand shift ";
+        else if ( autowing )
+            artimsg = wingcmd;
 	}
 	else if ( strstr(arg, "troops") )
 	{
@@ -14478,6 +14625,7 @@ FUNC_DATA cmd_table[] =
 	{ "shrine",    do_map_shrine,  CMD_MAP },
 	{ "ruler",     do_map_ruler,   CMD_MAP },
 	{ "remake",		do_map_remake,	CMD_MAP },
+	{ "wing",      do_map_wing,    CMD_MAP },
 	/* Area commands. */
 	{ "help",		do_area_help,	CMD_AREA },
 	{ "create",	do_area_create,	CMD_AREA },
