@@ -31,7 +31,7 @@
 #include <sys/stat.h>
 
 int mapper_version_major = 5;
-int mapper_version_minor = 74;
+int mapper_version_minor = 8;
 
 
 char *i_mapper_id = I_MAPPER_ID "\r\n" I_MAPPER_H_ID "\r\n" HEADER_ID "\r\n" MODULE_ID "\r\n";
