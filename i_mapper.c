@@ -5457,10 +5457,9 @@ void show_path( ROOM_DATA *current )
 		nrmax = 4000;
 
 	sprintf( buf, C_R "[Path: " C_G );
-    autowing = cmp_room_wing();
+	autowing = cmp_room_wing();
     if (autowing) {
-    room = get_room(wingroom);
-    artimsg = wingcmd;
+    room = get_room( wingroom );
     }
     else {
     room = current;}
