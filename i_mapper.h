@@ -1,19 +1,19 @@
 /*
  * Copyright (c) 2004, 2005  Andrei Vasiliu
- * 
- * 
+ *
+ *
  * This file is part of MudBot.
- * 
+ *
  * MudBot is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * MudBot is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with MudBot; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
@@ -42,22 +42,22 @@ struct exit_data
 {
    char *command; /* This command will trigger the exit. */
    char *message; /* Or, this message will trigger the exit. */
- 
+
    int nolook; /* if nolook is set it will not add a -1 to queue */
    int nomsg; /* if nomsg is set, spexit will check the command and move accordingly */
    int alias;     /* This will contain a direction. */
-   
+
    /* And when it was triggered, it will take us here. */
    /* If vnum is -1, then set get_unlost. */
   /* int stepvnum; what is this? */
    int vnum;
    int new_vnum;
    ROOM_DATA *to;
-   
+
    /* Chain links. */
    EXIT_DATA *next;
    ROOM_DATA *owner;
-}; 
+};
 
 
 struct wormhole_data
@@ -65,7 +65,7 @@ struct wormhole_data
   int vnum;
   int new_vnum;
   ROOM_DATA *to;
-  
+
   WORMHOLE_DATA *next;
   ROOM_DATA *owner;
 
@@ -77,7 +77,7 @@ struct room_data
 {
    char *name;
    int vnum;
-   int vnum_old; 
+   int vnum_old;
    int aetvnum;
    int shop;
    int tmark;
@@ -92,28 +92,28 @@ struct room_data
    char *owner;
    char *ruler;
    int shrineblock;
-   
+
    ROOM_TYPE *room_type;
-   
+
    short mapped;
    short landmark;
    short pointed_by;
    short worm_pointed_by;
    short underwater;
-   
+
    ROOM_DATA *next_in_world;
    ROOM_DATA *next_in_area;
    ROOM_DATA *next_in_hash;
-   
+
    int next_direction;
-   
+
    /* NULL, N, NE, E, SE, S, SW, W, NW, UP, DOWN, IN, OUT */
    ROOM_DATA *exits[13];
    ROOM_DATA *reverse_exits[13];
    char *noexitcmd[13];
    char *noexitmsg[13];
    int more_reverse_exits[13];
-   
+
    /* Beginning of binary-saved values. If you change these, change save_binary_map! */
    int vnum_exits[13];
    short detected_exits[13];
@@ -126,13 +126,13 @@ struct room_data
    short int hasrandomexits;
    short int trueexit[13];
    /* End. */
-   
+
    ELEMENT *tags;
-   
+
    EXIT_DATA *special_exits;
    WORMHOLE_DATA *wormhole;
    AREA_DATA *area;
-   
+
    /* Pathfinder. */
    int pf_cost;
    int pf_direction;
@@ -141,7 +141,7 @@ struct room_data
    ROOM_DATA *pf_parent;
    ROOM_DATA *next_in_pfno;
    ROOM_DATA *next_in_pfco;
-   
+
    /* Person in this room. */
    char *person_here;
 };
@@ -151,15 +151,16 @@ struct area_data
 {
    char *name;
    char *note;
-   
+
    int disabled;
+   int nowingarea;
    int city;
-   
+
    int needs_cleaning;
-   
+
    ROOM_DATA *rooms;
    ROOM_DATA *last_room;
-   
+
    AREA_DATA *next;
 };
 
@@ -176,19 +177,19 @@ struct area_data
 struct map_element
 {
    ROOM_DATA *room;
-   
+
    char *color;
    char *rcolor;
-   
+
    short in_out;
    short up;
    short down;
-   
+
    short e;		/* - */
    short s;		/* | */
    short se;		/* \ */  /* se AND se_rev: */
    short se_rev;	/* / */  /* X */
-   
+
    short extra_e;
    short extra_s;
    short extra_se;
@@ -223,13 +224,13 @@ struct room_type_data
 {
    char *name;
    char *color;
-   
+
    int cost_in;
    int cost_out;
-   
+
    int must_swim;
    int underwater;
-   
+
    ROOM_TYPE *next;
 };
 
@@ -238,9 +239,9 @@ struct room_type_data
 struct function_data
 {
    char *name;
-   
+
    void (*func)( char *arg );
-   
+
    int base_cmd;
 };
 
@@ -249,7 +250,7 @@ struct color_data
 {
    char *name;
    char *code;
-   
+
    char *title_code;
    int length;
 };
@@ -262,10 +263,10 @@ struct element_data
    ELEMENT *next;
    ELEMENT *prev;
    ELEMENT **first;
-   
+
    /* One pointer value. */
    void *p;
-   
+
    /* And one integer value. */
    int value;
 };
@@ -274,7 +275,7 @@ struct city_data
 {
    char *name;
    char *color;
-   
+
    int count;
    CITY_DATA *next;
 };
@@ -283,7 +284,7 @@ struct divine_data
 {
    char *name;
    char *relation;
-   
+
    DIVINE_DATA *next;
 };
 

@@ -257,6 +257,7 @@ char *underitem;
 char *wingcmd;
 int wingroom = 0;
 int wingtmpdisable = 0;
+int autowing = 0;
 
 int wateroption = 0;
 int automapsize = 0;
@@ -358,6 +359,7 @@ void i_mapper_mxp_enabled( );
 void locate_room_in_area( char *name, char *player,int nl, AREA_DATA *sarea );
 void do_map_shrine(char *arg);
 void do_map_path( char *arg );
+int cmp_room_wing();
 
 AREA_DATA *get_area_by_name( char *string );
 int case_strstr( char *haystack, char *needle );
@@ -2243,6 +2245,16 @@ void parse_ruler( char *line )
 		clientfr("ruler error");
 }
 
+void parse_nowingarea(char *line)
+{
+    if (strcmp("Your powers cannot carry you over continents or planes.",line))
+    return;
+
+    if ( !current_room->area->nowingarea ) {
+    current_room->area->nowingarea = 1;
+    clientfr("Area added to NoWings List");
+    }
+}
 
 int can_dash( ROOM_DATA *room )
 {
@@ -2354,7 +2366,8 @@ void go_next( )
 			guardmove = 2;
 			auto_walk = 2;}
 	}
-	else if ( artimsg ) {
+	else if ( artimsg || cmp_room_wing() ) {
+	    artimsg = wingcmd;
 		sprintf( buf, "say %s", artimsg );
 		clientfr( buf );
 		sprintf( buf, "say %s\r\n", artimsg );
@@ -4038,6 +4051,8 @@ void save_map( char *file )
 			fprintf( fl, "Note: %s\n", area->note );
 		if ( area->disabled )
 			fprintf( fl, "Disabled\n" );
+        if ( area->nowingarea )
+            fprintf( fl, "NoWings\n");
 		if ( area->city )
 			fprintf( fl, "City\n" );
 		fprintf( fl, "\n" );
@@ -4977,6 +4992,16 @@ int load_map( char *file )
 
 			area->disabled = 1;
 		}
+		else if ( !strncmp( line, "NoWings", 8 ) )
+		{
+			if ( section != 1 )
+			{
+				debugf( "Wrong section of a Disabled statement." );
+				return 1;
+			}
+
+			area->nowingarea = 1;
+		}
 		else if ( !strncmp( line, "City", 4 ) )
 		{
 			if ( section != 1 )
@@ -5237,20 +5262,23 @@ int cmp_room_wing()
     if (wingroom == 0 || wingcmd == NULL || disable_artifacts || wingtmpdisable )
     return 0;
 
-    if (!strcmp(current_room->area->name, "The Havens."))
-    return 0;
+    if (!strcmp(current_room->area->name, "The Havens.")) {
+    return 0;}
+    if (!strcmp(current_room->area->name,"Hunting Grounds.")) {
+    return 0;}
+    if (current_room->area->nowingarea) {
+    return 0;}
 
     ROOM_DATA *room;
-    int lennorm;
-    int lenwing;
-
+    int lennorm = 0;
+    int lenwing = 0;
 
     for (room = current_room; room; room = room->pf_parent) {lennorm++;}
     for (room = get_room(wingroom); room; room = room->pf_parent) {lenwing++;}
-    if (lenwing<lennorm)
-    return 1;
-    else
-    return 0;
+    if (lenwing<lennorm) {
+    return 1;}
+    else {
+    return 0;}
 }
 
 int get_cost( ROOM_DATA *src, ROOM_DATA *dest )
@@ -5406,7 +5434,6 @@ void show_path( ROOM_DATA *current )
 	int wrap = 7; /* strlen( "[Path: " ) */
 	int nrmax = 100;
 	int hexited = 0;
-    int autow;
     int aused = 0;
 
 	DEBUG( "show_path" );
@@ -5430,13 +5457,13 @@ void show_path( ROOM_DATA *current )
 		nrmax = 4000;
 
 	sprintf( buf, C_R "[Path: " C_G );
-    autow = cmp_room_wing();
-    if (autow) {
+    autowing = cmp_room_wing();
+    if (autowing) {
     room = get_room(wingroom);
     artimsg = wingcmd;
     }
-    else
-    room = current;
+    else {
+    room = current;}
 	for ( room = room; room && room->pf_parent && nr < nrmax; room = room->pf_parent )
 	{
 		if ( wrap > 70 && !disable_pathwrap )
@@ -5451,7 +5478,7 @@ void show_path( ROOM_DATA *current )
 		}
 
 		/* We also have special exits. */
-		if (autow && !aused)
+		if (autowing && !aused)
 		{strcat(buf, C_D);
 			strcat( buf, wingcmd);
 			wrap += strlen(wingcmd);
@@ -5540,10 +5567,6 @@ void show_path( ROOM_DATA *current )
 		}
 	}
 	strcat( buf, C_R ".]\r\n" C_0 );
-	if ( strstr( buf, "voltda" ) )
-	{artimsg = "voltda";
-		if ( strstr( buf, "voltdaran" ) ) {
-			artimsg = "voltdaran";}}
 	clientf( buf );
 }
 
@@ -8356,6 +8379,8 @@ void i_mapper_process_server_line( LINE *l )
 	/* owner? */
 	parse_owner( l->line );
 	parse_ruler( l->line );
+	/* no wing areas */
+	parse_nowingarea( l->line );
 	/* fullline cleanup */
 	if ( fulllineok ) {
 		memset( fullline, '\0', sizeof(fullline) );}
@@ -9116,6 +9141,7 @@ void do_map_path( char *arg )
 	target = NULL;
 	justwarped = 0;
 	except = NULL;
+    autowing = 0;
 
 	if ( !arg[0] )
 	{
@@ -11413,8 +11439,8 @@ void do_area_info( char *arg )
 				detected_only++;
 	}
 	sprintf( buf, C_R "Rooms: " C_G "%d" C_R "  Unlinked exits: " C_G
-			"%d" C_R "  Unknown type rooms: " C_G "%d" C_R "  Disabled: " C_G "%s" C_R ".",
-			rooms, detected_only, unknown_type,  current_area->disabled ? "Yes" : "No" );
+			"%d" C_R "  Unknown type rooms: " C_G "%d" C_R "  Disabled: " C_G "%s" C_R "  NoWings: " C_G "%s" C_R ".",
+			rooms, detected_only, unknown_type,  current_area->disabled ? "Yes" : "No", current_area->nowingarea ? "Yes" : "No" );
 	clientfr( buf );
 
 	if ( !strcmp( arg, "extra" ) ) {
@@ -14255,7 +14281,7 @@ void do_go( char *arg )
 	memset(guardnum,'\0',sizeof(guardnum));
 	troopmove = 0;
 	guardmove = 0;
-	int autowing;
+	autowing = 0;
 	autowing = cmp_room_wing();
 	if ( strstr(arg, "gallop") )
 		if ( !mounted )
@@ -14272,38 +14298,6 @@ void do_go( char *arg )
 		dash_command = "sand shift ";
     else if ( autowing )
          artimsg = wingcmd;
-	else if ( strstr( arg, "voltda" ) )
-	{
-		artimsg = "voltda";
-		if ( strstr( arg, "voltdaran" ) )
-			artimsg = "voltdaran";
-		if ( strstr( arg, "gallop" ) )
-			dash_command = "gallop ";
-		else if ( strstr( arg, "dash" ) )
-			dash_command = "dash ";
-		else if ( strstr( arg, "sprint" ) )
-			dash_command = "sprint ";
-		else if ( strstr(arg, "shift") )
-			dash_command = "sand shift ";
-        else if ( autowing )
-            artimsg = wingcmd;
-	}
-	else if ( strstr( arg, "duanathar" ) )
-	{
-		artimsg = "duanathar";
-		if ( strstr( arg, "duanatharan" ) )
-			artimsg = "duanatharan";
-		if ( strstr( arg, "gallop" ) )
-			dash_command = "gallop ";
-		else if ( strstr( arg, "dash" ) )
-			dash_command = "dash ";
-		else if ( strstr( arg, "sprint" ) )
-			dash_command = "sprint ";
-		else if ( strstr(arg, "shift") )
-			dash_command = "sand shift ";
-        else if ( autowing )
-            artimsg = wingcmd;
-	}
 	else if ( strstr(arg, "troops") )
 	{
 		strcpy(troopn, arg + 7 );
