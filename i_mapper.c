@@ -31,7 +31,7 @@
 #include <sys/stat.h>
 
 int mapper_version_major = 5;
-int mapper_version_minor = 8;
+int mapper_version_minor = 82;
 
 
 char *i_mapper_id = I_MAPPER_ID "\r\n" I_MAPPER_H_ID "\r\n" HEADER_ID "\r\n" MODULE_ID "\r\n";
@@ -257,6 +257,7 @@ char *underitem;
 char *wingcmd;
 int wingroom = 0;
 int wingtmpdisable = 0;
+int wingtmproomdisable = 0;
 int autowing = 0;
 
 int wateroption = 0;
@@ -337,6 +338,8 @@ int force_save;
 ROOM_DATA *bump_room;
 int bump_exits;
 int area_search;
+int area_leylinesearch;
+ROOM_DATA *sleyroom;
 int searching;
 ROOM_DATA *search_room;
 char area_search_for[256];
@@ -355,11 +358,14 @@ void i_mapper_process_server_line( LINE *line );
 void i_mapper_process_server_prompt( LINE *line );
 int  i_mapper_process_client_command( char *cmd );
 int  i_mapper_process_client_aliases( char *cmd );
+/*void i_mapper_process_server_paragraph( LINES *l );*/
 void i_mapper_mxp_enabled( );
 void locate_room_in_area( char *name, char *player,int nl, AREA_DATA *sarea );
 void do_map_shrine(char *arg);
 void do_map_path( char *arg );
 int cmp_room_wing();
+void init_openlist( ROOM_DATA *room );
+void path_finder( );
 
 AREA_DATA *get_area_by_name( char *string );
 int case_strstr( char *haystack, char *needle );
@@ -377,6 +383,7 @@ ENTRANCE( i_mapper_module_register )
 	self->process_server_prompt = i_mapper_process_server_prompt;
 	self->process_client_command = NULL;
 	self->process_client_aliases = i_mapper_process_client_aliases;
+/*	self->process_server_paragraph = i_mapper_process_server_paragraph;*/
 	self->build_custom_prompt = NULL;
 	self->main_loop = NULL;
 	self->update_descriptors = NULL;
@@ -2245,14 +2252,35 @@ void parse_ruler( char *line )
 		clientfr("ruler error");
 }
 
-void parse_nowingarea(char *line)
+void nowinglongreset()
 {
-    if (strcmp("Your powers cannot carry you over continents or planes.",line))
+    wingtmproomdisable = 0;
+    clientff(C_W"[Automatic wings enabled]\r\n"C_0);
+}
+
+void parse_nowing(char *line)
+{
+    if (strcmp("Your powers cannot carry you over continents or planes.",line) && strcmp("You open your mouth to speak, but the sound dies as soon as it leaves your mouth.",line))
     return;
+
+    if (!strcmp("You open your mouth to speak, but the sound dies as soon as it leaves your mouth.",line))
+    {wingtmproomdisable=1;
+     clientff(C_D"\r\n[Automatic wings disabled for 10 seconds]\r\n"C_0);
+	 add_timer( "wings_disabled_timer", 10, nowinglongreset, 0, 0, 0 );
+	 if ( auto_walk )
+	 {
+	     auto_walk = 2;
+	 }
+      return;}
 
     if ( !current_room->area->nowingarea ) {
     current_room->area->nowingarea = 1;
     clientfr("Area added to NoWings List");
+    if ( auto_walk )
+	 {
+	     auto_walk = 2;
+	 }
+    return;
     }
 }
 
@@ -2328,6 +2356,35 @@ void go_next( )
 				clientff(C_R"\r\n[Unable to find path to "C_y"%s "C_G"%d"C_R"]\r\n"C_0,search_room->name,search_room->vnum);
 			}
 		}
+		if (area_leylinesearch)
+		{
+		ROOM_DATA *r;
+		int i;
+
+		r = sleyroom, i = 0;
+		/* Count rooms left. */
+		while ( r )
+		{
+			r = r->next_in_area;
+			i++;
+		}
+
+		clientff( C_R "\r\n[Rooms left: %d.]\r\n" C_0, i - 1 );
+
+		sleyroom = sleyroom->next_in_area;
+
+		if ( !sleyroom )
+		{
+			area_leylinesearch = 0;
+			clientfr( "All rooms searched." );
+			return;
+		}
+
+		init_openlist( NULL );
+		init_openlist( sleyroom );
+		path_finder( );
+		go_next( );
+		}
 	}
 	else if ( troopmove == 1 && troopn != NULL )
 	{
@@ -2373,7 +2430,7 @@ void go_next( )
 		sprintf( buf, "say %s\r\n", artimsg );
 		send_to_server( buf );
 		auto_walk = 1;
-		mode = GET_UNLOST;
+/*		mode = GET_UNLOST; */
 		artimsg = NULL;
 	}
 	else if ( swim_next && mounted ) {
@@ -5259,7 +5316,7 @@ void init_openlist( ROOM_DATA *room )
 
 int cmp_room_wing()
 {
-    if (wingroom == 0 || wingcmd == NULL || disable_artifacts || wingtmpdisable )
+    if (wingroom == 0 || wingcmd == NULL || disable_artifacts || wingtmpdisable || wingtmproomdisable )
     return 0;
 
     if (!strcmp(current_room->area->name, "The Havens.")) {
@@ -6340,8 +6397,9 @@ void parse_angelrite(char *li)
 	if ( !cmp("Your angel senses *.",line) ) {
 		if ( ( line = strstr(line, " at ") ) )
 		{line += 4;
-			if ( !( end = strstr(line, ", on a health ") ) )
-				end = strstr(line, " on a health");
+			if ( !( end = strstr(line, ", with a health ") ) )
+			   if (	!( end = strstr(line, " with a health") ) )
+			      return;
 			strncpy( buf, line, end - line );
 			buf[end-line] = '.';
 			buf[end-line+1] = 0;
@@ -6378,6 +6436,10 @@ void parse_wormholes( char *line )
 
 void parse_scry( char *line )
 {
+	if ( !fulllineok )
+		return;
+	line = fullline;
+
 	char buf[256];
 	char name[256];
 
@@ -6385,32 +6447,20 @@ void parse_scry( char *line )
 
 	int pool = strncmp( line, "You create a pool of water in the air in front of you, and look through it,", 75 );
 	int mirror = strncmp( line, "You create a shimmering mirror in the air in front of you, and look through it,", 79 );
-	if ( !sense_message && ( pool || mirror) ) {
+	int fire = strncmp(line, "A burst of white-hot steam flows out of your fingertips, and as the steam condenses, you see an image",101);
+	if ( pool && mirror && fire ) {
 		return;
 	}
 
-	if ( !sense_message )
-	{
 		if ( !mirror ) {
 			line += 79;
 		}
 		else if ( !pool ) {
 			line += 75;
 		}
-
-		line = get_string( line, buf, 256 );
-		if ( !strncmp(buf, "sensing", 7) ) {
-			line = get_string( line, name, 256 );
-			line = get_string( line, buf, 256 );
-			locate_room( line, 1, name );
-		} else {
-
-			sense_message = 1;
-		}
-	}
-
-	if ( sense_message == 1 )
-	{
+		else if ( !fire ) {
+		    line += 101;
+        }
 		/* Next line: "sensing Whyte at Antioch Runners tent." */
 		/* Skip the first three words. */
 		line = get_string( line, buf, 256 );
@@ -6418,7 +6468,6 @@ void parse_scry( char *line )
 		line = get_string( line, buf, 256 );
 
 		locate_room( line, 1, name );
-	}
 }
 
 
@@ -7439,6 +7488,8 @@ void parse_special_exits( char *line )
 				{
 					current_room = spexit->to;
 					current_area = current_room->area;
+					if ( !disable_automap ) {
+						didmove = 1;}
 					if ( !spexit->nolook )
 					{add_queue_top( -1 );}
 					else
@@ -7478,13 +7529,13 @@ void parse_special_exits( char *line )
 					{havenstore = current_room;}
 					current_room = spexit->to;
 					current_area = current_room->area;
+					if ( !disable_automap ) {
+						didmove = 1;}
 					if ( !spexit->nolook )
 					{add_queue_top( -1 );}
 					else
 					{if ( auto_walk )
 						auto_walk = 2;}
-					if ( !disable_automap ) {
-						didmove = 1;}
 				}
 				else
 				{
@@ -7928,6 +7979,28 @@ void parse_aetoliastuff ( char *line )
 	}
 }
 
+
+void parse_arealeylinesearch( char *line )
+{
+   if (!area_leylinesearch)
+     return;
+   if (strstr(line,"motes of light cascade around the untapped focal point here, wavering in and out of reality with each resonance of the leyline."))
+     {
+         area_leylinesearch = 0;
+         sleyroom = NULL;
+         		if ( auto_walk != 0 )
+		        {
+			     auto_walk = 0;
+			     justwarped = 0;
+                 dash_command = NULL;
+			     except = NULL;
+			    }
+         clientff(C_R"\r\n[LEYLINE FOUND]\r\n"C_0);
+         return;
+     }
+}
+
+
 void parse_areasearch( char *line )
 {
 	if (!area_search)
@@ -8201,7 +8274,6 @@ void check_autobump( )
 }
 
 
-
 void i_mapper_process_server_line( LINE *l )
 {
 	const char *block_messages[] =
@@ -8379,7 +8451,7 @@ void i_mapper_process_server_line( LINE *l )
 	parse_owner( l->line );
 	parse_ruler( l->line );
 	/* no wing areas */
-	parse_nowingarea( l->line );
+	parse_nowing( l->line );
 	/* fullline cleanup */
 	if ( fulllineok ) {
 		memset( fullline, '\0', sizeof(fullline) );}
@@ -8416,19 +8488,21 @@ void i_mapper_process_server_line( LINE *l )
 	if ( mode == FOLLOWING || mode == CREATING )
 		parse_underwater( line );
 
+	parse_arealeylinesearch( l->line );
 	parse_autobump( line );
 	parse_areasearch( l->line );
 	parse_infohere( l->line );
 
+
 	if ( !cmp( "You have recovered balance on all limbs.", l->line ) )
 	{
-		if ( mode == FOLLOWING && auto_walk && ( burrowed || current_room->pointed_by || dash_command ) )
+		if ( mode == FOLLOWING && auto_walk /*&& ( burrowed || current_room->pointed_by || dash_command ) */)
 			auto_walk = 2;
 	}
 
 	if ( !cmp( "You have recovered equilibrium.", l->line ) )
 	{
-		if ( mode == FOLLOWING && auto_walk && ( troopmove || justwarped || dash_command || guardmove ) )
+		if ( mode == FOLLOWING && auto_walk /* && ( troopmove || justwarped || dash_command || guardmove )*/ )
 		{
 			auto_walk = 2;
 			if ( justwarped ) justwarped = 0;
@@ -8863,6 +8937,22 @@ void i_mapper_process_server_prompt( LINE *l )
 		l->gag_ending = 1;
 	}
 }
+/*
+void i_mapper_process_server_paragraph( LINES *l )
+{
+   int line;
+
+
+   for ( line = 1; line <= l->nr_of_lines; line++ )
+     {
+
+     }
+
+
+
+
+   i_mapper_process_server_prompt( NULL );
+}*/
 
 
 
@@ -10430,7 +10520,8 @@ void do_area_help( char *arg )
 			" area conn   - Will inform you of which areas are connected to this and where.\r\n"
 			" area destroy- Will destroy the area you enter after it.\r\n"
 			" area types  - Will show you the room types in this area.\r\n"
-			" area note   - Will allow you to set a note for the area you are in.\r\n");
+			" area note   - Will allow you to set a note for the area you are in.\r\n"
+			" area leyline- Will allow you to search for leylines, remember to have detection up!\r\n");
 }
 
 void do_area_destroy( char *arg )
@@ -10737,6 +10828,72 @@ void do_area_find( char *arg )
 	clientff(C_R"["C_G"%d"C_W" rooms found."C_R"]\r\n"C_0, count);
 }
 
+
+void do_area_leys( char *arg )
+{
+    if ( !current_area)
+    {
+        clientfr("No current area.");
+        return;
+    }
+	if ( !strcmp(arg,"help") || !arg[0] )
+    {
+        clientfr("Area Leyline help");
+        clientff(" area leyline search  - Begins searching the current area for a leyline.\r\n"
+                 " area leyline skip    - Willskip past any room you can't enter.\r\n"
+                 " area leyline stop    - Stops the searching.\r\n");
+    }
+    if (!current_room)
+    {
+        clientfr("No currenet room");
+        return;
+    }
+    if (!strcmp(arg,"search"))
+    { clientfr("The Hunt for a Leyline has begun!");
+      area_leylinesearch = 1;
+      sleyroom = current_room->area->rooms;
+  	  init_openlist( NULL );
+	  init_openlist( sleyroom );
+	  path_finder( );
+	  go_next( );
+    }
+    if (!strcmp(arg,"skip"))
+    {
+      area_leylinesearch = 1;
+	  sleyroom = sleyroom->next_in_area;
+  	  init_openlist( NULL );
+	  init_openlist( sleyroom );
+	  path_finder( );
+	  clientfr( "Skipped one room." );
+      go_next( );
+    }
+    if (!strcmp(arg,"stop"))
+    {
+        area_leylinesearch = 0;
+		init_openlist( NULL );
+		sleyroom = NULL;
+		clientfr("Searching Stopped");
+		return;
+    }
+    if (!strcmp(arg,"continue"))
+    {
+        if (!sleyroom)
+        {
+            clientfr("cannot continue searching");
+        }
+        else
+        {
+            area_leylinesearch = 1;
+            clientfr("Leyline search continuing");
+  	        init_openlist( NULL );
+	        init_openlist( sleyroom );
+	        path_finder( );
+	        go_next( );
+        }
+    }
+}
+
+
 void do_area_search( char *arg )
 {
 	if ( !current_area )
@@ -10744,7 +10901,7 @@ void do_area_search( char *arg )
 		clientfr( "No current area." );
 		return;
 	}
-	if ( !strcmp(arg,"help") )
+	if ( !strcmp(arg,"help") || !arg[0] )
 	{clientfr("Area Search Help:");
 		clientff(" area search Help     - This help file.\r\n"
 				" area search nostop   - Will toggle stopping on finding what is searched for.\r\n"
@@ -14295,6 +14452,8 @@ void do_go( char *arg )
 		dash_command = "gallop ";
 	else if ( !strcmp(arg, "shift") )
 		dash_command = "sand shift ";
+    else if ( strstr(arg, "wing") )
+        artimsg = wingcmd;
     else if ( autowing )
          artimsg = wingcmd;
 	else if ( strstr(arg, "troops") )
@@ -14631,6 +14790,7 @@ FUNC_DATA cmd_table[] =
 	{ "find",      do_area_find,   CMD_AREA },
 	{ "connected", do_area_conn,   CMD_AREA },
 	{ "search",    do_area_search, CMD_AREA },
+	{ "leyline",   do_area_leys,   CMD_AREA },
 	{ "switch",	do_area_switch,	CMD_AREA },
 	{ "destro",    do_area_fulld,  CMD_AREA },
 	{ "destroy",   do_area_destroy,CMD_AREA },
