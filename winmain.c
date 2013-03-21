@@ -29,8 +29,9 @@
 //#define _WIN32_IE 0x0500
 #define _WIN32_IE 0x0300
 
-#include <windows.h>
+
 #include <winsock2.h>
+#include <windows.h>
 #include <commctrl.h>
 #include <shlwapi.h>
 #include <shellapi.h>
@@ -199,12 +200,12 @@ int WINAPI WinMain( HINSTANCE hInst, HINSTANCE hPrevInstance, LPSTR lpCmdLine, i
 
    MSG msg;
 
-   hInstance = hInst;
-
    /* Initialize WSA. */
    WORD wVersionRequested;
    WSADATA wsaData;
    wVersionRequested = MAKEWORD( 1, 0 );
+
+   hInstance = hInst;
 
    if ( WSAStartup( wVersionRequested, &wsaData ) )
      {
@@ -922,7 +923,7 @@ void check_descriptors( )
 }
 
 
-
+/* old timer
 void UpdateTimer( )
 {
    void check_timers( );
@@ -931,6 +932,26 @@ void UpdateTimer( )
 
    if ( timers )
      SetTimer( hwndMain, 0, 200, NULL );
+}
+*/
+
+void UpdateTimer( )
+{
+   void get_first_timer( time_t *sec, time_t *usec );
+   void check_timers( );
+   time_t sec, usec;
+   int delay;
+
+   check_timers( );
+
+   if ( timers )
+     {
+        get_first_timer( &sec, &usec );
+        delay = (int)((sec*1000) + (usec/1000) + 1);
+        SetTimer( hwndMain, 0, delay, NULL );
+     }
+   else
+     KillTimer( hwndMain, 0 );
 }
 
 
@@ -1045,7 +1066,7 @@ void LoadBuffer( int b )
 void BlendWindow( HWND hwndMain, DWORD dwTime, DWORD dwFlags )
 {
    HINSTANCE dll;
-   BOOL (*func_AnimateWindow)( HWND hwnd, DWORD dwTime, DWORD dwFlags );
+   BOOL (WINAPI*func_AnimateWindow)( HWND hwnd, DWORD dwTime, DWORD dwFlags );
 
    dll = LoadLibrary( "user32.dll" );
 
@@ -1054,7 +1075,7 @@ void BlendWindow( HWND hwndMain, DWORD dwTime, DWORD dwFlags )
 	return;
      }
 
-   func_AnimateWindow = (void *) GetProcAddress( dll, "AnimateWindow" );
+   func_AnimateWindow = (BOOL (WINAPI*)( HWND, DWORD, DWORD))GetProcAddress( dll, "AnimateWindow" );
 
    if ( !func_AnimateWindow )
      {
@@ -1301,7 +1322,7 @@ LRESULT CALLBACK EditorWndProc( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 }
 
 /* A poor implementation of gettimeofday, just for local use. */
-
+/*
 int gettimeofday( struct timeval *tv, void *tz )
 {
    LARGE_INTEGER frequency, counter;
@@ -1312,7 +1333,7 @@ int gettimeofday( struct timeval *tv, void *tz )
    if ( !QueryPerformanceFrequency( &frequency ) )
      return -1;
 
-   /* Too big for us? */
+    Too big for us? */ /*
    if ( frequency.HighPart )
      return -1;
 
@@ -1325,6 +1346,43 @@ int gettimeofday( struct timeval *tv, void *tz )
    tv->tv_sec = counter.LowPart / frequency.LowPart;
 
    tv->tv_usec = ( counter.LowPart % frequency.LowPart ) * 1e6 / frequency.LowPart;
+
+   return 0;
+}
+*/
+int gettimeofday( struct timeval *tv, void *tz )
+{
+   LARGE_INTEGER frequency, lcounter;
+   unsigned long long counter;
+
+   tv->tv_sec = 0;
+   tv->tv_usec = 0;
+
+   if ( !QueryPerformanceFrequency( &frequency ) )
+     return -1;
+
+   /* Too big for us? */
+   if ( frequency.HighPart )
+     return -1;
+
+   if ( !frequency.LowPart /*&& !frequency.HighPart*/ )
+     return -1;
+
+   if ( !QueryPerformanceCounter( &lcounter ) )
+     return -1;
+
+   //seconds = LargeIntegerDivide( counter, frequency, NULL );
+   counter = lcounter.HighPart;
+   counter = counter << 32;
+   counter += lcounter.LowPart;
+
+   tv->tv_sec = (long)(counter / frequency.LowPart);
+
+   counter = counter % frequency.LowPart;
+   counter *= (unsigned long long)1e6;
+   counter /= frequency.LowPart;
+
+   tv->tv_usec = (long)counter;
 
    return 0;
 }

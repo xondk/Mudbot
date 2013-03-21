@@ -13,7 +13,7 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with MudBot; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
@@ -35,8 +35,8 @@
 # define ENTRANCE( name ) void (name)( MODULE *self )
 #else
 # if defined( FOR_WINDOWS )
-#  define ENTRANCE( name ) BOOL WINAPI __declspec( dllexport ) LibMain( HINSTANCE hDLLInst, DWORD fdwReason, LPVOID lpvReserved ) { return TRUE; } \
-   void __declspec( dllexport ) module_register( MODULE *self )
+#  define ENTRANCE( name ) __declspec( dllexport ) BOOL WINAPI LibMain( HINSTANCE hDLLInst, DWORD fdwReason, LPVOID lpvReserved ) { return TRUE; } \
+   __declspec( dllexport ) void module_register( MODULE *self )
 # else
 #  define ENTRANCE( name ) void module_register( MODULE *self )
 # endif
@@ -52,6 +52,11 @@ void	(*replace)( char *string );
 void	(*insert)( int pos, char *string );
 void	(*prefixf)( char *string, ... ) __attribute__ ( ( format( printf, 1, 2 ) ) );
 void	(*suffixf)( char *string, ... ) __attribute__ ( ( format( printf, 1, 2 ) ) );
+void    (*vprefixf)( char *string, va_list args );
+void    (*vsuffixf)( char *string, va_list args );
+void    (*vclientff)( char *string, va_list args );
+void	(*set_line)( int line );
+
 
 /* Communication */
 MODULE* (*get_modules)( );
@@ -75,12 +80,20 @@ int	(*gettimeofday)( struct timeval *tv, void * );
 #endif
 char *	(*get_string)( char *argument, char *arg_first, int max );
 int	(*cmp)( char *trigger, char *string );
+void	(*extract_wildcard)( int nr, char *dest, int max );
 
-/* Timers */
+/* Timers */ /*
 TIMER *	(*get_timers)( );
 int	(*get_timer)( );
 void	(*add_timer)( char *name, int delay, void (*cb)( TIMER *self ), int d0, int d1, int d2 );
-void	(*del_timer)( char *name );
+void	(*del_timer)( char *name ); */
+/* Timers */
+TIMER * (*get_timers)( );
+int     (*get_timer)( );
+TIMER * (*add_timer)( const char *name, float delay, void (*cb)( TIMER *self ), int d0, int d1, int d2 );
+void    (*del_timer)( const char *name );
+
+
 
 /* Networking */
 DESCRIPTOR *(*get_descriptors)( );
@@ -102,6 +115,9 @@ int	(*c_close)( int fd );
    insert = self->get_func( "insert" ); \
    prefixf = self->get_func( "prefixf" ); \
    suffixf = self->get_func( "suffixf" ); \
+   vprefixf = self->get_func( "vprefixf" ); \
+   vsuffixf = self->get_func( "vsuffixf" ); \
+   vclientff = self->get_func( "vclientff" ); \
    /* Communication */ \
    get_modules = self->get_func( "get_modules" ); \
    get_variable = self->get_func( "get_variable" ); \

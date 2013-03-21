@@ -94,15 +94,19 @@
 
 #define MAIN_ID "$Name: Release_6 $ $Id: main.c,v 3.1 2005/12/08 18:02:55 andreivasiliu Exp $"
 
+#ifdef _MSC_VER
+#include <io.h>
+#else
 #include <unistd.h>	/* For write(), read() */
+#endif
 #include <stdarg.h>	/* For variable argument functions */
 #include <signal.h>	/* For signal() */
 #include <time.h>	/* For time() */
 #include <sys/stat.h>	/* For stat() */
 #include <fcntl.h>	/* For fcntl() */
-
+/*
 #include "header.h"
-
+*/
 /* Portability stuff. */
 #if defined( FOR_WINDOWS )
 # include <winsock2.h>    /* All winsock2 stuff. */
@@ -121,8 +125,11 @@
 # endif
 #endif
 
+/* Visual Studio likes to have winsock2.h included before windows.h */
+#include "header.h"
+
 int main_version_major = 2;
-int main_version_minor = 42;
+int main_version_minor = 44;
 
 
 
@@ -145,6 +152,9 @@ void replace( char *string );
 void insert( int pos, char *string );
 void prefixf( char *string, ... ) __attribute__ ( ( format( printf, 1, 2 ) ) );
 void suffixf( char *string, ... ) __attribute__ ( ( format( printf, 1, 2 ) ) );
+void vprefixf( char *string, va_list args );
+void vsuffixf( char *string, va_list args );
+void vclientff( char *string, va_list args );
 
 /* Communication */
 MODULE *get_modules( );
@@ -170,11 +180,19 @@ int cmp( char *str1, char *str2 );
 int wccmp( char *str1, char *str2 );
 int swwccmp( char *str1, char *str2 );
 
-/* Timers */
+/* Timers */ /*
 TIMER *get_timers( );
 int get_timer( );
 void add_timer( char *name, int delay, void (*cb)( TIMER *self ), int d0, int d1, int d2 );
+void del_timer( char *name ); */
+/* Timers */
+TIMER *get_timers( );
+int get_timer( );
+TIMER *add_timer( const char *name, float delay, void (*cb)( TIMER *self ), int d0, int d1, int d2 );
 void del_timer( char *name );
+void unlink_timer( TIMER *timer );
+void free_timer( TIMER *timer );
+
 
 /* Networking */
 DESCRIPTOR *get_descriptors( );
@@ -386,6 +404,9 @@ void *get_function( char *name )
 		{ "insert", insert },
 		{ "prefixf", prefixf },
 		{ "suffixf", suffixf },
+        { "vclientff", vclientff },
+        { "vprefixf", prefixf },
+        { "vsuffixf", suffixf },
 		/* Communication */
 		{ "get_variable", get_variable },
 		{ "get_modules", get_modules },
@@ -624,7 +645,7 @@ void generate_config( char *file_name )
 			"#listen_on \"1523\"\n\n\n" );
 
 	fprintf( fl, "# If these are commented or left empty, MudBot will ask the user where to connect.\n\n"
-			"host \"imperian.com\"\n"
+			"host \"aetolia.com\"\n"
 			"port \"23\"\n\n\n" );
 
 	fprintf( fl, "# Autologin. Requires ATCP.\n"
@@ -666,11 +687,8 @@ void generate_config( char *file_name )
 	type = "so";
 #endif
 
-	write_mod( "imperian", type, fl );
 	write_mod( "i_mapper", type, fl );
-	write_mod( "i_offense", type, fl );
-	write_mod( "mmchat", type, fl );
-	write_mod( "voter", type, fl );
+
 
 	fprintf( fl, "\n" );
 
@@ -969,16 +987,20 @@ void unload_module( MODULE *module )
 		break;
 	}
 
+	/* Make sure no timer linked to it exists anymore. */
 	while ( 1 )
 	{
 		for ( t = timers; t; t = t->next )
 			if ( t->mod == module )
 			{
-				remove_timer( t );
-				continue;
+				unlink_timer( t );
+				free_timer( t );
+				break;
 			}
-		break;
+		if ( !t )
+			break;
 	}
+
 
 	/* Unlink it for good. */
 #if !defined( FOR_WINDOWS )
@@ -1137,6 +1159,35 @@ void load_module( char *name )
 }
 
 
+void get_first_timer( time_t *sec, time_t *usec )
+{
+   TIMER *t, *first = NULL;
+   struct timeval now;
+
+   for ( t = timers; t; t = t->next )
+     if ( !first || t->fire_at_sec < first->fire_at_sec ||
+          ( t->fire_at_sec == first->fire_at_sec &&
+            t->fire_at_usec < first->fire_at_usec ) )
+       first = t;
+
+   if ( !first )
+     return;
+
+   gettimeofday( &now, NULL );
+
+   *sec = first->fire_at_sec - now.tv_sec;
+   *usec = first->fire_at_usec - now.tv_usec;
+   if ( *usec < 0 )
+     {
+        *usec += 1000000;
+        *sec -= 1;
+     }
+
+   /* In other words.. immediately. */
+   if ( *sec < 0 )
+     *sec = *usec = 0;
+}
+
 
 void do_reload_module( char *name )
 {
@@ -1284,7 +1335,7 @@ void strip_unprint( char *string, char *dest )
 	DEBUG( "strip_unprint" );
 
 	for ( a = string, b = dest; *a; a++ )
-		if ( isprint( *a ) )
+		if ( *a >= 0 && isprint( *a )  )
 		{
 			*b = *a;
 			b++;
@@ -1419,6 +1470,24 @@ void module_process_server_prompt( LINE *line )
 	mod_section = NULL;
 
 	clientf_modifies_suffix = 0;
+}
+
+
+void module_process_server_gmcp( char *gmcp )
+{
+        MODULE *module;
+
+        DEBUG( "module_process_server_gmcp" );
+
+        mod_section = "Processing server gmcp";
+
+        for ( module = modules; module; module = module->next )
+        {
+                current_mod = module;
+                if ( module->process_server_gmcp )
+                        (module->process_server_gmcp)( gmcp );
+        }
+        mod_section = NULL;
 }
 
 
@@ -2315,6 +2384,37 @@ void suffixf( char *string, ... )
 }
 
 
+void vclientff( char *string, va_list args )
+{
+   char buf [ 4096 ];
+
+   vsnprintf( buf, 4096, string, args );
+   va_end( args );
+
+   clientf( buf );
+}
+
+void vprefixf( char *string, va_list args )
+{
+   char buf [ 4096 ];
+
+   vsnprintf( buf, 4096, string, args );
+   va_end( args );
+
+   prefix( buf );
+}
+
+void vsuffixf( char *string, va_list args )
+{
+   char buf [ 4096 ];
+
+   vsnprintf( buf, 4096, string, args );
+   va_end( args );
+
+   suffix( buf );
+}
+
+
 void insert( int pos, char *string )
 {
 	if ( !current_new_line )
@@ -2470,6 +2570,32 @@ void copy_over( char *reason )
 }
 
 
+void unlink_timer( TIMER *timer )
+{
+   TIMER *t;
+
+   if ( timers == timer )
+     timers = timer->next;
+   else
+     for ( t = timers; t; t = t->next )
+       if ( t->next == timer )
+         {
+            t->next = timer->next;
+            break;
+         }
+}
+
+
+
+void free_timer( TIMER *timer )
+{
+   if ( timer->destroy_cb )
+     timer->destroy_cb( timer );
+
+   if ( timer->name )
+     free( timer->name );
+   free( timer );
+}
 
 void remove_timer( TIMER *timer )
 {
@@ -2493,94 +2619,87 @@ void remove_timer( TIMER *timer )
 }
 
 
-void update_timers( TIMER *except )
-{
-	TIMER *t;
-	int tm;
-	int diff;
-
-	tm = time( NULL );
-
-	diff = tm - last_timer;
-	last_timer = tm;
-
-	for ( t = timers; t; t = t->next )
-	{
-		if ( t != except )
-			t->delay -= diff;
-	}
-}
-
-
 void check_timers( )
 {
-	TIMER *t;
+   TIMER *t;
+   struct timeval now;
 
-	update_timers( NULL );
+   gettimeofday( &now, NULL );
 
-	/* Check the timers. */
-	while ( 1 )
-	{
-		/* A While loop is much safer than t_next = t->next. */
+   /* Check the timers. */
+   while ( 1 )
+     {
+        /* A While loop is much safer than t_next = t->next. */
 
-		for ( t = timers; t; t = t->next )
-		{
-			if ( t->delay <= 0 )
-			{
-				TIMER temp;
+        for ( t = timers; t; t = t->next )
+          if ( t->fire_at_sec < now.tv_sec ||
+               ( t->fire_at_sec == now.tv_sec &&
+                 t->fire_at_usec <= now.tv_usec ) )
+            {
+               /* Remove first, execute later. Why? Because it may be added again. */
+               unlink_timer( t );
 
-				/* Remove first, execute later. Why? Because it may be added again. */
-				temp = *t;
-				temp.next = NULL;
-				remove_timer( t );
+               current_mod = t->mod;
+               if ( t->callback )
+                 (*t->callback)( t );
 
-				if ( temp.callback )
-					(*temp.callback)( &temp );
+               free_timer( t );
 
-				break;
-			}
-		}
+               break;
+            }
 
-		if ( t )
-			continue;
-		else
-			break;
-	}
+        if ( !t )
+          break;
+     }
 }
 
 
 
-void add_timer( char *name, int delay, void (*cb)( TIMER *timer ),
-		int d0, int d1, int d2 )
+TIMER *add_timer( const char *name, float delay, void (*cb)( TIMER *timer ),int d0, int d1, int d2 )
 {
-	TIMER *t = NULL;
+   TIMER *t;
+   struct timeval now;
 
-	//   debugf( "Timer: Add [%s] (%d)", name, delay );
+//   debugf( "Timer: Add [%s] (%d)", name, delay );
 
-	/* All delays should be set from the same source time. */
-	update_timers( NULL );
+   /* Check if we already have it in the list. */
+   if ( name && name[0] != '*' )
+     for ( t = timers; t; t = t->next )
+       {
+          if ( !strcmp( t->name, name ) )
+            break;
+       }
+   else
+     t = NULL;
 
-	/* Check if we already have it in the list. */
-	for ( t = timers; t; t = t->next )
-	{
-		if ( !strcmp( t->name, name ) )
-			break;
-	}
+   if ( !t )
+     {
+        t = calloc( sizeof( TIMER ), 1 );
+        t->name = _strdup( name );
+        t->next = timers;
+        timers = t;
+     }
 
-	if ( !t )
-	{
-		t = calloc( sizeof( TIMER ), 1 );
-		t->name = strdup( name );
-		t->next = timers;
-		timers = t;
-	}
+   gettimeofday( &now, NULL );
+   t->fire_at_sec = now.tv_sec + (int) (delay);
+   t->fire_at_usec = now.tv_usec + (int) ((unsigned long long) (delay * 1000000) % 1000000);
 
-	t->delay = delay;
-	t->callback = cb;
-	t->data[0] = d0;
-	t->data[1] = d1;
-	t->data[2] = d2;
+   if ( t->fire_at_usec >= 1000000 )
+     {
+        t->fire_at_sec += 1;
+        t->fire_at_usec -= 1000000;
+     }
+
+   t->callback = cb;
+   t->data[0] = d0;
+   t->data[1] = d1;
+   t->data[2] = d2;
+
+   t->mod = current_mod;
+
+   return t;
 }
+
 
 
 
@@ -2649,6 +2768,8 @@ void handle_gmcp( char *buf )
 	int we_control_it;
 
 	we_control_it = strcmp( gmcp_login_as, "none" );
+
+	module_process_server_gmcp( buf );
 
 	buf = get_string(buf, act, 256);
 
@@ -2822,17 +2943,18 @@ char *get_string( const char *argument, char *arg_first, int max )
 void mxp( char *string, ... )
 {
 	char buf [ 4096 ];
-
-	if ( !mxp_enabled )
-		return;
-
 	va_list args;
 	va_start( args, string );
 	vsnprintf( buf, 4096, string, args );
 	va_end( args );
 
+	if ( !mxp_enabled )
+		return;
+
+
 	clientf( buf );
 }
+
 
 
 int mxp_tag( int tag )
@@ -3063,8 +3185,10 @@ void process_client_line( char *buf )
 		else if ( !strcmp( buf, "`timers" ) )
 		{
 			TIMER *t;
+			struct timeval now;
+			int sec, usec;
 
-			update_timers( NULL );
+			gettimeofday( &now, NULL );
 
 			if ( !timers )
 				clientfb( "No timers." );
@@ -3072,7 +3196,14 @@ void process_client_line( char *buf )
 			{
 				clientfb( "Timers:" );
 				for ( t = timers; t; t = t->next )
-					clientff( " - '%s' (%d)\r\n", t->name, t->delay );
+				{
+					clientff( " - At: %d.%.6d\r\n", t->fire_at_sec, t->fire_at_usec );
+					sec = (int)(t->fire_at_sec - now.tv_sec);
+					usec = (int)(t->fire_at_usec - now.tv_usec);
+					if ( usec < 0 )
+						usec += 1000000, sec -= 1;
+					clientff( " - '%s' (%d.%.6d)\r\n", t->name, sec, usec, -1 );
+				}
 			}
 		}
 		else if ( !strcmp( buf, "`desc" ) )
@@ -3155,6 +3286,13 @@ void process_client_line( char *buf )
 			gtk_show_editor();
 #endif
 		}
+#if defined( FOR_WINDOWS )
+        else if ( !strcmp(buf, "`clear") )
+        {
+          debugf("cleanandclearitmessage");
+          clientf(C_W"Terminal Cleared\r\n"C_0);
+        }
+#endif
 		else if ( !strncmp( buf, "`license", 8 ) )
 		{
 			clientf( C_W " Copyright (C) 2004, 2005  Andrei Vasiliu\r\n"
@@ -3742,7 +3880,7 @@ void process_buffer( char *raw_buf, int bytes )
 				}
 
 				/* Define what we support */
-				sprintf(buf, "%s" "Core.Supports.Set [ \"Char 1\", \"Room 1\", \"IRE.Composer 1\" ]" "%s",
+				sprintf(buf, "%s" "Core.Supports.Set [ \"Core 1\", \"Char 1\", \"Room 1\", \"IRE.Composer 1\", \"Comm 1\", \"Char.Items 1\", \"Char.Skills 1\" ]" "%s",
 						sb_gmcp, iac_se);
 				send_to_server( buf );
 				continue;

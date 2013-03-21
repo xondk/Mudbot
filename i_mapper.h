@@ -92,6 +92,7 @@ struct room_data
    char *owner;
    char *ruler;
    int shrineblock;
+   short int markfordeletion;
 
    ROOM_TYPE *room_type;
 
